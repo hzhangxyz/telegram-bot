@@ -60,7 +60,7 @@ class Message(Base):
     msg_id: sqlalchemy.orm.Mapped[int] = sqlalchemy.orm.mapped_column(primary_key=True)
     user_id: sqlalchemy.orm.Mapped[int]
     is_me: sqlalchemy.orm.Mapped[bool]
-    text: sqlalchemy.orm.Mapped[str]
+    text: sqlalchemy.orm.Mapped[str] = sqlalchemy.orm.mapped_column(sqlalchemy.Text)
     model: sqlalchemy.orm.Mapped[str | None] = sqlalchemy.orm.mapped_column(sqlalchemy.String(32))
     reply_id: sqlalchemy.orm.Mapped[int | None]
 
@@ -398,23 +398,61 @@ class BotApp:
         history = await message.history(self.database_session)
         model = typing.cast(str, history[0].model)
 
-        new_msg_id = await self._send_message(chat_id, f"[{model}]", msg_id)
-        self.pending_pool.add((chat_id, new_msg_id))
-        reply = ""
+        async with MessageSender(self, chat_id, msg_id, model) as sender:
+            reply = ""
+            async for delta in self.models[model](history):
+                reply += delta
+                await sender.update(reply)
+        new_msg_id = sender.new_msg_id
 
-        target_time = time.time() + 1
-        async for delta in self.models[model](history):
-            reply += delta
-            current_time = time.time()
-            if current_time > target_time:
-                await self._edit_message(chat_id, f"[{model}] " + reply, new_msg_id)
-                target_time = current_time + 3
-        await self._edit_message(chat_id, f"[{model}] " + reply, new_msg_id)
-        await self._edit_message(chat_id, f"`[{model}]` " + reply, new_msg_id, parse_mode="Markdown")
-
-        self.pending_pool.remove((chat_id, new_msg_id))
         new_message = Message(chat_id=chat_id, msg_id=new_msg_id, user_id=self.bot_id, is_me=True, text=reply, model=None, reply_id=msg_id)
         await new_message.add(self.database_session)
+
+        await self._edit_message(chat_id, f"`[{model}]` " + reply, new_msg_id, parse_mode="Markdown")
+
+
+class MessageSender:
+
+    def __init__(self, owner: BotApp, chat_id: int, msg_id: int, model: str):
+        self.owner = owner
+        self.chat_id = chat_id
+        self.msg_id = msg_id
+        self.model = model
+        self.last_update = True
+        self.start = False
+        self.first = True
+        self.reply = ""
+
+    async def __aenter__(self):
+        return self
+
+    async def _update(self):
+        if self.first:
+            self.first = False
+            self.new_msg_id = await self.owner._send_message(self.chat_id, f"[{self.model}] " + self.reply, self.msg_id)
+            self.owner.pending_pool.add((self.chat_id, self.new_msg_id))
+        else:
+            await self.owner._edit_message(self.chat_id, f"[{self.model}] " + self.reply, self.new_msg_id)
+
+    async def update(self, reply: str):
+        if self.reply == reply:
+            return
+        self.reply = reply
+        if not self.start:
+            self.target_time = time.time() + 1
+            self.start = True
+        current_time = time.time()
+        if current_time > self.target_time:
+            await self._update()
+            self.last_update = False
+            self.target_time = current_time + 3
+        else:
+            self.last_update = True
+
+    async def __aexit__(self, *args):
+        if self.last_update:
+            await self._update()
+        self.owner.pending_pool.remove((self.chat_id, self.new_msg_id))
 
 
 def echo() -> Model:
