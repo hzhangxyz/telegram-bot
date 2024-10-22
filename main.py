@@ -132,10 +132,11 @@ def only_user(func: Handle) -> Handle:
 
     @functools.wraps(func)
     async def wrapper(self: "BotApp", update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
-        if await self._is_admin(update.message.from_user.id) or await self._is_user(update.message.from_user.id):
+        if await self._is_admin(update.message.from_user.id) or await self._is_user(update.effective_chat.id):
             await func(self, update, context)
         else:
-            await self._send_message(update.effective_chat.id, 'only user', update.message.message_id)
+            if update.effective_chat.id == update.message.from_user.id:
+                await self._send_message(update.effective_chat.id, 'only user', update.message.message_id)
 
     return wrapper
 
