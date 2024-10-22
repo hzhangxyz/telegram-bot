@@ -1,0 +1,30 @@
+database:
+  url: sqlite+aiosqlite:///./telegram_llm_bot.db
+telegram:
+  owner_id: 1234567
+  token: abcdefg
+models:
+  - name: yi-lightning
+    prefix: "&"
+    type: gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://api.lingyiwanwu.com/v1
+      model: yi-lightning
+      owner: 01-AI
+  - name: gpt-4o-mini
+    prefix: $
+    type: azure_gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://hzhangxyzopenai.openai.azure.com
+      model: gpt-4o-mini
+      owner: OpenAI
+  - name: gpt-4o
+    prefix: $$
+    type: azure_gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://hzhangxyzopenai.openai.azure.com
+      model: gpt-4o
+      owner: OpenAI

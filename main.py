@@ -539,7 +539,7 @@ def gpt(*, model: str, api_key: str, endpoint: str, owner: str) -> Model:
 
 
 if __name__ == '__main__':
-    import json
+    import yaml
 
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
@@ -553,8 +553,8 @@ if __name__ == '__main__':
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
-    with open("config.json", "rt") as file:
-        config = json.load(file)
+    with open("config.yml", "rt") as file:
+        config = yaml.safe_load(file)
 
     app = BotApp(
         telegram_token=config["telegram"]["token"],

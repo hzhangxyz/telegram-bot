@@ -1,4 +1,4 @@
 env
 *.db
 *.log
-config.json
+config.yml
