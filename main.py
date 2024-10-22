@@ -1,5 +1,6 @@
 from __future__ import annotations
 import sys
+import time
 import functools
 import typing
 import logging
@@ -185,12 +186,13 @@ class BotApp:
         self.logger.info('Message sent: chat_id=%r, reply_to_message_id=%r, message_id=%r', chat_id, reply_to_message_id, msg.message_id)
         return msg.message_id
 
-    async def _edit_message(self, chat_id: int, text: str, message_id: int) -> None:
+    async def _edit_message(self, chat_id: int, text: str, message_id: int, parse_mode: str | None = None) -> None:
         self.logger.info('Editing message: chat_id=%r, message_id=%r, text=%r', chat_id, message_id, text)
         await self.app.bot.edit_message_text(
             text,
             chat_id=chat_id,
             message_id=message_id,
+            parse_mode=parse_mode,
         )
         self.logger.info('Message edited: chat_id=%r, message_id=%r', chat_id, message_id)
 
@@ -399,25 +401,16 @@ class BotApp:
         new_msg_id = await self._send_message(chat_id, f"[{model}]", msg_id)
         self.pending_pool.add((chat_id, new_msg_id))
         reply = ""
-        done = False
 
-        async def update_message():
-            last_reply = ""
-            stop = False
-            while True:
-                stop = done
-                if last_reply != reply:
-                    await self._edit_message(chat_id, f"[{model}] " + reply, new_msg_id)
-                    last_reply = reply
-                if stop:
-                    break
-                await asyncio.sleep(3)
-
-        task = asyncio.create_task(update_message())
+        target_time = time.time() + 1
         async for delta in self.models[model](history):
             reply += delta
-        done = True
-        await task
+            current_time = time.time()
+            if current_time > target_time:
+                await self._edit_message(chat_id, f"[{model}] " + reply, new_msg_id)
+                target_time = current_time + 3
+        await self._edit_message(chat_id, f"[{model}] " + reply, new_msg_id)
+        await self._edit_message(chat_id, f"`[{model}]` " + reply, new_msg_id, parse_mode="Markdown")
 
         self.pending_pool.remove((chat_id, new_msg_id))
         new_message = Message(chat_id=chat_id, msg_id=new_msg_id, user_id=self.bot_id, is_me=True, text=reply, model=None, reply_id=msg_id)
