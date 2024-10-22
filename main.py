@@ -351,15 +351,18 @@ class BotApp:
         await self.app.start()
         await self.app.updater.start_polling()
         self.logger.info("The application is running")
-        while True:
-            await asyncio.sleep(3600)
+        try:
+            while True:
+                await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            self.logger.info("Keyboard interrupt")
         self.logger.info("Stop the application")
         await self.app.updater.stop()
         await self.app.stop()
         await self.app.shutdown()
 
         self.logger.info("Disconnect from database")
-        await engine.dispose()
+        await self.database_engine.dispose()
 
     @only_user
     async def _message_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
