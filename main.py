@@ -298,11 +298,12 @@ class BotApp:
         await self._remove_user(id)
         await self._send_message(update.effective_chat.id, "done", update.message.message_id)
 
-    def __init__(self, telegram_token: str, database_url: str, owner_id: int, logger: logging.Logger) -> None:
+    def __init__(self, telegram_token: str, database_url: str, owner_id: int, logger: logging.Logger, proxy: str | None = None) -> None:
         self.telegram_token: str = telegram_token
         self.database_url: str = database_url
         self.owner_id: int = owner_id
         self.logger: logging.Logger = logger
+        self.proxy: str | None = proxy
 
         self.bot_id: int = int(self.telegram_token.split(':')[0])
         self.pending_pool: PendingPool = PendingPool(self.logger)
@@ -325,15 +326,21 @@ class BotApp:
 
     async def run(self):
         self.logger.info("Connect to database")
-        self.database_engine = sqlalchemy.ext.asyncio.create_async_engine(self.database_url)
-        self.database_session = sqlalchemy.ext.asyncio.async_sessionmaker(self.database_engine, expire_on_commit=False)
-        async with self.database_engine.begin() as conn:
+        database_engine = sqlalchemy.ext.asyncio.create_async_engine(self.database_url)
+        self.database_session = sqlalchemy.ext.asyncio.async_sessionmaker(database_engine, expire_on_commit=False)
+        async with database_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         if not await self._is_admin(self.owner_id):
             await self._add_admin(self.owner_id)
 
         self.logger.info("Create telegram app")
-        self.app = telegram.ext.ApplicationBuilder().token(self.telegram_token).concurrent_updates(True).build()
+        builder = telegram.ext.ApplicationBuilder()
+        builder.token(self.telegram_token)
+        builder.concurrent_updates(True)
+        if self.proxy is not None:
+            builder.proxy(self.proxy)
+            builder.get_updates_proxy(self.proxy)
+        self.app = builder.build()
         self.logger.info("Add command handlers")
         self.app.add_handler(telegram.ext.CommandHandler("ping", self._ping_handle))
         self.app.add_handler(telegram.ext.CommandHandler("list_model", self._list_model_handle))
@@ -364,7 +371,7 @@ class BotApp:
         await self.app.shutdown()
 
         self.logger.info("Disconnect from database")
-        await self.database_engine.dispose()
+        await database_engine.dispose()
 
     @only_user
     async def _message_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
@@ -597,10 +604,8 @@ if __name__ == '__main__':
         config = yaml.safe_load(file)
 
     app = BotApp(
-        telegram_token=config["telegram"]["token"],
-        database_url=config["database"]["url"],
-        owner_id=config["telegram"]["owner_id"],
         logger=logger,
+        **config["app"]
     )
 
     for model in config["models"]:

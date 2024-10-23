@@ -1,8 +1,7 @@
-database:
-  url: sqlite+aiosqlite:///./telegram_llm_bot.db
-telegram:
+app:
+  telegram_token: abcdefg
+  database_url: sqlite+aiosqlite:///./telegram_llm_bot.db
   owner_id: 1234567
-  token: abcdefg
 models:
   - name: yi-lightning
     prefix: "&"
