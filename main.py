@@ -69,13 +69,15 @@ class Message(Base):
             sess.add(self)
             await sess.commit()
 
-    async def history(self, session: sqlalchemy.ext.asyncio.async_sessionmaker[sqlalchemy.ext.asyncio.AsyncSession]) -> list[Message]:
+    async def history(self, session: sqlalchemy.ext.asyncio.async_sessionmaker[sqlalchemy.ext.asyncio.AsyncSession]) -> list[Message] | None:
         async with session() as sess:
             result = [self]
             msg_id = self.reply_id
             while msg_id is not None:
                 query = await sess.execute(sqlalchemy.select(Message).filter_by(chat_id=self.chat_id, msg_id=msg_id))
-                message = query.scalars().one()
+                message = query.scalars().first()
+                if message is None:
+                    return None
                 result.append(message)
                 msg_id = message.reply_id
 
@@ -399,6 +401,10 @@ class BotApp:
 
         await message.add(self.database_session)
         history = await message.history(self.database_session)
+        if history is None:
+            self.logger.info("History broken")
+            await self._send_message(chat_id, "history broken", msg_id)
+            return
         model = typing.cast(str, history[0].model)
 
         async with MessageSender(self, chat_id, msg_id, model) as sender:
