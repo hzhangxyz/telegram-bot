@@ -5,6 +5,7 @@ import functools
 import typing
 import logging
 import asyncio
+import httpx
 import telegram
 import telegram.ext
 import sqlalchemy
@@ -480,7 +481,7 @@ def echo() -> Model:
     return reply
 
 
-def azure_gpt(*, model: str, api_key: str, endpoint: str, owner: str) -> Model:
+def azure_gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | None = None) -> Model:
     import openai
     import datetime
 
@@ -488,6 +489,7 @@ def azure_gpt(*, model: str, api_key: str, endpoint: str, owner: str) -> Model:
         api_key=api_key,
         api_version="2024-02-15-preview",
         azure_endpoint=endpoint,
+        http_client=httpx.AsyncClient(proxy=proxy) if proxy is not None else None,
         max_retries=0,
         timeout=15,
     )
@@ -533,13 +535,14 @@ def azure_gpt(*, model: str, api_key: str, endpoint: str, owner: str) -> Model:
     return reply
 
 
-def gpt(*, model: str, api_key: str, endpoint: str, owner: str) -> Model:
+def gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | None = None) -> Model:
     import openai
     import datetime
 
     aclient = openai.AsyncOpenAI(
         api_key=api_key,
         base_url=endpoint,
+        http_client=httpx.AsyncClient(proxy=proxy) if proxy is not None else None,
         max_retries=0,
         timeout=15,
     )
@@ -603,10 +606,7 @@ if __name__ == '__main__':
     with open("config.yml", "rt") as file:
         config = yaml.safe_load(file)
 
-    app = BotApp(
-        logger=logger,
-        **config["app"]
-    )
+    app = BotApp(logger=logger, **config["app"])
 
     for model in config["models"]:
         app.prefixes[model["prefix"]] = model["name"]
