@@ -1,5 +1,6 @@
 # Telegram LLM Bot
 
-This is a telegram LLM Bot with both code and design copied from [zzh1996](https://github.com/zzh1996/chatgpt-telegram-bot).
+This is a Telegram LLM Bot, with code and design adapted from [zzh1996](https://github.com/zzh1996/chatgpt-telegram-bot).
 
-To start the bot, write your `config.yml` file, which can be referenced from `config.example.yml`, and then run `python main.py`.
+I am using Python 3.12.7, with dependencies listed in `requirements.txt`, although other versions may work as well.
+To start the bot, create your own `config.yml` file based on `config.example.yml`, then run `python main.py`.
