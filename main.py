@@ -591,7 +591,7 @@ def gemini(*, model: str, api_key: str, owner: str, proxy: str | None = None) ->
         messages = []
         for message in history:
             messages.append({"role": "model" if message.is_me else "user", "parts": [{"text": message.text}]})
-        data = {
+        payload = {
             "contents":
                 messages,
             "systemInstruction": {
@@ -612,7 +612,7 @@ def gemini(*, model: str, api_key: str, owner: str, proxy: str | None = None) ->
         }
 
         async with httpx.AsyncClient(proxy=proxy) as client:
-            async with client.stream("POST", base_url, headers=headers, params=params, data=json.dumps(data)) as response:
+            async with client.stream("POST", base_url, headers=headers, params=params, data=json.dumps(payload)) as response:
                 async for chunk in response.aiter_text():
                     for line in chunk.splitlines():
                         if line.startswith("data:"):
