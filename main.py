@@ -215,17 +215,17 @@ class BotApp:
         await self._send_message(update.effective_chat.id, reply, update.message.message_id, parse_mode="Markdown")
 
     async def _list_model_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
-        reply = "\n".join([f"prefix {p} for model {m}" for p, m in self.prefixes.items()])
-        await self._send_message(update.effective_chat.id, reply, update.message.message_id)
+        reply = "\n".join([f"`{p}` : {m}" for p, m in self.prefixes.items()])
+        await self._send_message(update.effective_chat.id, reply, update.message.message_id, parse_mode="Markdown")
 
     @only_admin
     async def _list_admin_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
         ids = await self._ls_admin()
         if ids:
-            reply = ", ".join([str(id) for id in ids])
+            reply = ", ".join([f"{id}" if id < 0 else f"[{id}](tg://user?id={id})" for id in ids])
         else:
             reply = "empty"
-        await self._send_message(update.effective_chat.id, reply, update.message.message_id)
+        await self._send_message(update.effective_chat.id, reply, update.message.message_id, parse_mode="Markdown")
 
     @only_admin
     async def _add_admin_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
@@ -259,10 +259,10 @@ class BotApp:
     async def _list_user_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
         ids = await self._ls_user()
         if ids:
-            reply = ", ".join([str(id) for id in ids])
+            reply = ", ".join([f"{id}" if id < 0 else f"[{id}](tg://user?id={id})" for id in ids])
         else:
             reply = "empty"
-        await self._send_message(update.effective_chat.id, reply, update.message.message_id)
+        await self._send_message(update.effective_chat.id, reply, update.message.message_id, parse_mode="Markdown")
 
     @only_admin
     async def _add_user_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
