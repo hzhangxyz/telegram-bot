@@ -300,10 +300,11 @@ class BotApp:
         await self._remove_user(id)
         await self._send_message(update.effective_chat.id, "done", update.message.message_id)
 
-    def __init__(self, telegram_token: str, database_url: str, owner_id: int, logger: logging.Logger, proxy: str | None = None) -> None:
+    def __init__(self, telegram_token: str, database_url: str, owner_id: int, continue_prefix: str, logger: logging.Logger, proxy: str | None = None) -> None:
         self.telegram_token: str = telegram_token
         self.database_url: str = database_url
         self.owner_id: int = owner_id
+        self.continue_prefix: str = "-"
         self.logger: logging.Logger = logger
         self.proxy: str | None = proxy
 
@@ -311,6 +312,7 @@ class BotApp:
         self.pending_pool: PendingPool = PendingPool(self.logger)
         self.prefixes: dict[str, str] = {}
         self.models: dict[str, Model] = {}
+        self.last_reply: dict[int, int] = {}
 
     async def _set_commands(self):
         await self.app.bot.set_my_commands([
@@ -385,28 +387,38 @@ class BotApp:
 
         reply_to_message = update.message.reply_to_message
         if reply_to_message is None:
-            reply_id = None
+            if text.startswith(self.continue_prefix):
+                text = text[len(self.continue_prefix):]
+                reply_id = self.last_reply.get(chat_id, None)
+                if reply_id is None:
+                    return
+                await self.pending_pool.wait_for((chat_id, reply_id))
+                model = None
+                message = Message(chat_id=chat_id, msg_id=msg_id, user_id=user_id, is_me=False, text=text, model=model, reply_id=reply_id)
+            else:
+                reply_id = None
 
-            prefix = ""
-            model = ""
-            for p, m in self.prefixes.items():
-                if text.startswith(p):
-                    if prefix is None or len(prefix) < len(p):
-                        prefix = p
-                        model = m
-            if model == "":
-                if update.effective_chat.id == update.message.from_user.id:
-                    await self._send_message(update.effective_chat.id, "unknown model", update.message.message_id)
-                return
-            text = text[len(prefix):]
-            message = Message(chat_id=chat_id, msg_id=msg_id, user_id=user_id, is_me=False, text=text, model=model, reply_id=reply_id)
-        elif update.message.reply_to_message.from_user.id == self.bot_id:
-            reply_id = reply_to_message.message_id
-            await self.pending_pool.wait_for((chat_id, reply_id))
-            model = None
-            message = Message(chat_id=chat_id, msg_id=msg_id, user_id=user_id, is_me=False, text=text, model=model, reply_id=reply_id)
+                prefix = ""
+                model = ""
+                for p, m in self.prefixes.items():
+                    if text.startswith(p):
+                        if prefix is None or len(prefix) < len(p):
+                            prefix = p
+                            model = m
+                if model == "":
+                    if update.effective_chat.id == update.message.from_user.id:
+                        await self._send_message(update.effective_chat.id, "unknown model", update.message.message_id)
+                    return
+                text = text[len(prefix):]
+                message = Message(chat_id=chat_id, msg_id=msg_id, user_id=user_id, is_me=False, text=text, model=model, reply_id=reply_id)
         else:
-            return
+            if update.message.reply_to_message.from_user.id == self.bot_id:
+                reply_id = reply_to_message.message_id
+                await self.pending_pool.wait_for((chat_id, reply_id))
+                model = None
+                message = Message(chat_id=chat_id, msg_id=msg_id, user_id=user_id, is_me=False, text=text, model=model, reply_id=reply_id)
+            else:
+                return
 
         await message.add(self.database_session)
         history = await message.history(self.database_session)
@@ -422,6 +434,7 @@ class BotApp:
                 reply += delta
                 await sender.update(reply)
         new_msg_id = sender.new_msg_id
+        self.last_reply[chat_id] = new_msg_id
 
         new_message = Message(chat_id=chat_id, msg_id=new_msg_id, user_id=self.bot_id, is_me=True, text=reply, model=None, reply_id=msg_id)
         await new_message.add(self.database_session)
