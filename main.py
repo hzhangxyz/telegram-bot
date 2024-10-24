@@ -98,16 +98,21 @@ class PendingPool:
     def __init__(self, logger: logging.Logger) -> None:
         self.logger: logging.Logger = logger
         self.pool: dict[tuple[int, int], asyncio.Event] = {}
+        self.last_reply: dict[int, int] = {}
 
     def add(self, key: tuple[int, int]) -> None:
         assert key not in self.pool
         self.pool[key] = asyncio.Event()
+        self.last_reply[key[0]] = key[1]
 
     def remove(self, key: tuple[int, int]) -> None:
         if key not in self.pool:
             return
         self.pool[key].set()
         del self.pool[key]
+
+    def get_last(self, chat_id: int) -> int | None:
+        return self.last_reply.get(chat_id, None)
 
     async def wait_for(self, key: tuple[int, int]) -> None:
         if key not in self.pool:
@@ -317,7 +322,6 @@ class BotApp:
         self.pending_pool: PendingPool = PendingPool(self.logger)
         self.prefixes: dict[str, str] = {}
         self.models: dict[str, Model] = {}
-        self.last_reply: dict[int, int] = {}
 
     async def _set_commands(self):
         await self.app.bot.set_my_commands([
@@ -397,7 +401,7 @@ class BotApp:
         if reply_to_message is None:
             if text.startswith(self.continue_prefix):
                 text = text[len(self.continue_prefix):]
-                reply_id = self.last_reply.get(chat_id, None)
+                reply_id = self.pending_pool.get_last(chat_id)
                 if reply_id is None:
                     return
                 await self.pending_pool.wait_for((chat_id, reply_id))
@@ -442,7 +446,6 @@ class BotApp:
                 reply += delta
                 await sender.update(reply)
         new_msg_id = sender.new_msg_id
-        self.last_reply[chat_id] = new_msg_id
 
         new_message = Message(chat_id=chat_id, msg_id=new_msg_id, user_id=self.bot_id, is_me=True, text=reply, model=None, reply_id=msg_id)
         await new_message.add(self.database_session)
