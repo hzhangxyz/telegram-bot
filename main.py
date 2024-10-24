@@ -264,13 +264,11 @@ class BotApp:
         await self._send_message(update.effective_chat.id, reply, update.message.message_id)
 
     async def _set_template_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
-        reply = await Template.get_template(self.database_session, update.effective_chat.id, update.message.from_user.id)
         args = " ".join(context.args)
         await Template.set_template(self.database_session, update.effective_chat.id, update.message.from_user.id, args)
         await self._send_message(update.effective_chat.id, args, update.message.message_id)
 
     async def _reset_template_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
-        reply = await Template.get_template(self.database_session, update.effective_chat.id, update.message.from_user.id)
         await Template.delete_template(self.database_session, update.effective_chat.id, update.message.from_user.id)
         await self._send_message(update.effective_chat.id, "reset", update.message.message_id)
 
