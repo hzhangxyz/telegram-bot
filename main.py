@@ -500,7 +500,6 @@ class MessageSender:
 def echo() -> Model:
 
     async def reply(history: list[Message]) -> typing.AsyncGenerator[str, None]:
-        yield "echo to "
         yield history[-1].text
 
     return reply
