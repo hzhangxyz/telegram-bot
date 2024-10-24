@@ -501,6 +501,28 @@ def echo() -> Model:
     return reply
 
 
+def anthropic(*, model: str, api_key: str, owner: str, proxy: str | None = None) -> Model:
+    import anthropic
+    import datetime
+
+    aclient = anthropic.AsyncAnthropic(
+        api_key=api_key,
+        http_client=httpx.AsyncClient(proxy=proxy) if proxy is not None else None,
+    )
+
+    async def reply(history: list[Message]) -> typing.AsyncGenerator[str, None]:
+        time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+        system = f"You are {model} Telegram bot. {model} is a large language model trained by {owner}. Answer as concisely as possible. Current Beijing Time: {time}"
+        messages = []
+        for message in history:
+            messages.append({"role": "assistant" if message.is_me else "user", "content": message.text})
+        async with aclient.messages.stream(model=model, messages=messages, max_tokens=1024, system=system) as stream:
+            async for text in stream.text_stream:
+                yield text
+
+    return reply
+
+
 def gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | None = None, azure: bool = False) -> Model:
     import openai
     import datetime
