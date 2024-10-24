@@ -2,6 +2,7 @@ from __future__ import annotations
 import sys
 import time
 import json
+import datetime
 import functools
 import typing
 import logging
@@ -25,7 +26,7 @@ class Ids:
     async def contain(cls, id: int, session: sqlalchemy.ext.asyncio.async_sessionmaker[sqlalchemy.ext.asyncio.AsyncSession]) -> bool:
         async with session() as sess:
             result = await sess.execute(sqlalchemy.select(cls).filter_by(id=id))
-            return result.scalars().first() is not None
+            return result.scalar_one_or_none() is not None
 
     @classmethod
     async def list(cls, session: sqlalchemy.ext.asyncio.async_sessionmaker[sqlalchemy.ext.asyncio.AsyncSession]) -> list[int]:
@@ -43,7 +44,7 @@ class Ids:
     async def remove(cls, id: int, session: sqlalchemy.ext.asyncio.async_sessionmaker[sqlalchemy.ext.asyncio.AsyncSession]) -> None:
         async with session() as sess:
             result = await sess.execute(sqlalchemy.select(cls).filter_by(id=id))
-            obj = result.scalars().one()
+            obj = result.scalar_one()
             await sess.delete(obj)
             await sess.commit()
 
@@ -76,8 +77,8 @@ class Message(Base):
             result = [self]
             msg_id = self.reply_id
             while msg_id is not None:
-                query = await sess.execute(sqlalchemy.select(Message).filter_by(chat_id=self.chat_id, msg_id=msg_id))
-                message = query.scalars().first()
+                query = await sess.execute(sqlalchemy.select(self.__class__).filter_by(chat_id=self.chat_id, msg_id=msg_id))
+                message = query.scalar_one_or_none()
                 if message is None:
                     return None
                 result.append(message)
@@ -91,6 +92,46 @@ class Message(Base):
 
     def __repr__(self) -> str:
         return str(self)
+
+
+class Template(Base):
+    __tablename__ = "template"
+
+    default_template = "You are {model} Telegram bot. {model} is a large language model trained by {owner}. Answer as concisely as possible. Current Beijing Time: {time}"
+    chat_id: sqlalchemy.orm.Mapped[int] = sqlalchemy.orm.mapped_column(sqlalchemy.BigInteger, primary_key=True)
+    user_id: sqlalchemy.orm.Mapped[int] = sqlalchemy.orm.mapped_column(sqlalchemy.BigInteger, primary_key=True)
+    template: sqlalchemy.orm.Mapped[str] = sqlalchemy.orm.mapped_column(sqlalchemy.Text, default=default_template)
+
+    @classmethod
+    async def set_template(cls, session: sqlalchemy.ext.asyncio.async_sessionmaker[sqlalchemy.ext.asyncio.AsyncSession], chat_id: int, user_id: int, template: str) -> None:
+        async with session() as sess:
+            query = await sess.execute(sqlalchemy.select(cls).filter_by(chat_id=chat_id, user_id=user_id))
+            result = query.scalar_one_or_none()
+            if result is None:
+                obj = cls(chat_id=chat_id, user_id=user_id, template=template)
+                sess.add(obj)
+            else:
+                result.template = template
+            await sess.commit()
+
+    @classmethod
+    async def get_template(cls, session: sqlalchemy.ext.asyncio.async_sessionmaker[sqlalchemy.ext.asyncio.AsyncSession], chat_id: int, user_id: int) -> str:
+        async with session() as sess:
+            query = await sess.execute(sqlalchemy.select(cls).filter_by(chat_id=chat_id, user_id=user_id))
+            result = query.scalar_one_or_none()
+            if result is None:
+                return cls.default_template
+            else:
+                return result.template
+
+    @classmethod
+    async def delete_template(cls, session: sqlalchemy.ext.asyncio.async_sessionmaker[sqlalchemy.ext.asyncio.AsyncSession], chat_id: int, user_id: int) -> None:
+        async with session() as sess:
+            query = await sess.execute(sqlalchemy.select(cls).filter_by(chat_id=chat_id, user_id=user_id))
+            result = query.scalar_one_or_none()
+            if result is not None:
+                await sess.delete(result)
+                await sess.commit()
 
 
 class PendingPool:
@@ -123,7 +164,7 @@ class PendingPool:
 
 
 Handle = typing.Callable[["BotApp", telegram.Update, telegram.ext.CallbackContext], typing.Awaitable[None]]
-Model = typing.Callable[[list[Message]], typing.AsyncGenerator[str, None]]
+Model = typing.Callable[[list[Message], str], typing.AsyncGenerator[str, None]]
 
 
 def only_admin(func: Handle) -> Handle:
@@ -217,6 +258,21 @@ class BotApp:
     async def _list_model_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
         reply = "\n".join([f"`{p}` : {m}" for p, m in self.prefixes.items()])
         await self._send_message(update.effective_chat.id, reply, update.message.message_id, parse_mode="Markdown")
+
+    async def _get_template_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
+        reply = await Template.get_template(self.database_session, update.effective_chat.id, update.message.from_user.id)
+        await self._send_message(update.effective_chat.id, reply, update.message.message_id)
+
+    async def _set_template_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
+        reply = await Template.get_template(self.database_session, update.effective_chat.id, update.message.from_user.id)
+        args = " ".join(context.args)
+        await Template.set_template(self.database_session, update.effective_chat.id, update.message.from_user.id, args)
+        await self._send_message(update.effective_chat.id, args, update.message.message_id)
+
+    async def _reset_template_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
+        reply = await Template.get_template(self.database_session, update.effective_chat.id, update.message.from_user.id)
+        await Template.delete_template(self.database_session, update.effective_chat.id, update.message.from_user.id)
+        await self._send_message(update.effective_chat.id, "reset", update.message.message_id)
 
     @only_admin
     async def _list_admin_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
@@ -328,6 +384,9 @@ class BotApp:
             ("help", "Get help"),
             ("ping", "Test bot connectivity"),
             ("list_model", "List models"),
+            ("get_template", "Get template system"),
+            ("set_template", "Set template system"),
+            ("reset_template", "Reset template system"),
             ("list_admin", "List admin (only admin)"),
             ("add_admin", "Add admin (only admin)"),
             ("remove_admin", "Remove admin (only admin)"),
@@ -359,6 +418,9 @@ class BotApp:
         self.app.add_handler(telegram.ext.CommandHandler("ping", self._ping_handle))
         self.app.add_handler(telegram.ext.CommandHandler("help", self._help_handle))
         self.app.add_handler(telegram.ext.CommandHandler("start", self._help_handle))
+        self.app.add_handler(telegram.ext.CommandHandler("get_template", self._get_template_handle))
+        self.app.add_handler(telegram.ext.CommandHandler("set_template", self._set_template_handle))
+        self.app.add_handler(telegram.ext.CommandHandler("reset_template", self._reset_template_handle))
         self.app.add_handler(telegram.ext.CommandHandler("list_model", self._list_model_handle))
         self.app.add_handler(telegram.ext.CommandHandler("list_admin", self._list_admin_handle))
         self.app.add_handler(telegram.ext.CommandHandler("add_admin", self._add_admin_handle))
@@ -441,8 +503,9 @@ class BotApp:
         model = typing.cast(str, history[0].model)
 
         async with MessageSender(self, chat_id, msg_id, model) as sender:
+            template = await Template.get_template(self.database_session, chat_id, user_id)
             reply = ""
-            async for delta in self.models[model](history):
+            async for delta in self.models[model](history, template):
                 reply += delta
                 await sender.update(reply)
         new_msg_id = sender.new_msg_id
@@ -493,30 +556,24 @@ class MessageSender:
         self.owner.pending_pool.remove((self.chat_id, self.new_msg_id))
 
 
-def echo() -> Model:
-
-    async def reply(history: list[Message]) -> typing.AsyncGenerator[str, None]:
-        yield history[-1].text
-
-    return reply
+def prompt(template, model, owner):
+    time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+    return template.format(model=model, owner=owner, time=time)
 
 
 def anthropic(*, model: str, api_key: str, owner: str, proxy: str | None = None) -> Model:
     import anthropic
-    import datetime
 
     aclient = anthropic.AsyncAnthropic(
         api_key=api_key,
         http_client=httpx.AsyncClient(proxy=proxy) if proxy is not None else None,
     )
 
-    async def reply(history: list[Message]) -> typing.AsyncGenerator[str, None]:
-        time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
-        system = f"You are {model} Telegram bot. {model} is a large language model trained by {owner}. Answer as concisely as possible. Current Beijing Time: {time}"
+    async def reply(history: list[Message], template: str) -> typing.AsyncGenerator[str, None]:
         messages = []
         for message in history:
             messages.append({"role": "assistant" if message.is_me else "user", "content": message.text})
-        async with aclient.messages.stream(model=model, messages=messages, max_tokens=1024, system=system) as stream:
+        async with aclient.messages.stream(model=model, messages=messages, max_tokens=1024, system=prompt(template, model, owner)) as stream:
             async for text in stream.text_stream:
                 yield text
 
@@ -524,12 +581,8 @@ def anthropic(*, model: str, api_key: str, owner: str, proxy: str | None = None)
 
 
 def gemini(*, model: str, api_key: str, owner: str, proxy: str | None = None) -> Model:
-    import datetime
 
-    async def reply(history: list[Message]) -> typing.AsyncGenerator[str, None]:
-        time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
-        system = f"You are {model} Telegram bot. {model} is a large language model trained by {owner}. Answer as concisely as possible. Current Beijing Time: {time}"
-
+    async def reply(history: list[Message], template: str) -> typing.AsyncGenerator[str, None]:
         base_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent"
         params = {'alt': 'sse', 'key': api_key}
         headers = {
@@ -543,7 +596,7 @@ def gemini(*, model: str, api_key: str, owner: str, proxy: str | None = None) ->
                 messages,
             "systemInstruction": {
                 "parts": [{
-                    "text": system
+                    "text": prompt(template, model, owner)
                 }]
             },
             "safetySettings": [{
@@ -590,7 +643,6 @@ def gemini(*, model: str, api_key: str, owner: str, proxy: str | None = None) ->
 
 def gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | None = None, azure: bool = False) -> Model:
     import openai
-    import datetime
 
     if azure:
         aclient = openai.AsyncAzureOpenAI(
@@ -610,9 +662,8 @@ def gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | Non
             timeout=15,
         )
 
-    async def reply(history: list[Message]) -> typing.AsyncGenerator[str, None]:
-        time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
-        messages = [{"role": "system", "content": f"You are {model} Telegram bot. {model} is a large language model trained by {owner}. Answer as concisely as possible. Current Beijing Time: {time}"}]
+    async def reply(history: list[Message], template: str) -> typing.AsyncGenerator[str, None]:
+        messages = [{"role": "system", "content": prompt(template, model, owner)}]
         for message in history:
             messages.append({"role": "assistant" if message.is_me else "user", "content": message.text})
         stream = await aclient.chat.completions.create(model=model, messages=messages, stream=True)
