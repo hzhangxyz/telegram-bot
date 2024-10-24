@@ -557,7 +557,10 @@ def gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | Non
 
 
 if __name__ == "__main__":
+    import sys
     import yaml
+
+    config_file = sys.argv[1] if len(sys.argv) > 1 else "config.yml"
 
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
@@ -571,7 +574,7 @@ if __name__ == "__main__":
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
-    with open("config.yml", "rt") as file:
+    with open(config_file, "rt", encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     app = BotApp(logger=logger, **config["app"])
