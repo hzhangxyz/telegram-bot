@@ -1,6 +1,7 @@
 from __future__ import annotations
 import sys
 import time
+import json
 import functools
 import typing
 import logging
@@ -584,6 +585,48 @@ def gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | Non
                         else:
                             yield f'\n\n[!] Error: finish_details="{obj.finish_details}"'
                     return
+
+    return reply
+
+
+def zhipu(*, model: str, api_key: str, endpoint: str, owner: str) -> Model:
+    import datetime
+
+    async def reply(history: list[Message]) -> typing.AsyncGenerator[str, None]:
+        time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
+        messages = [{"role": "system", "content": f'You are {model} Telegram bot. {model} is a large language model trained by {owner}. Answer as concisely as possible. Current Beijing Time: {time}'}]
+        for message in history:
+            messages.append({"role": "assistant" if message.is_me else "user", "content": message.text})
+
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        data = {"model": model, "messages": messages, "stream": True}
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(endpoint, headers=headers, content=json.dumps(data))
+
+            response.raise_for_status()
+            async for chunk in response.aiter_bytes():
+                decoded_chunk = chunk.decode('utf-8')
+                for line in decoded_chunk.splitlines():
+                    if line.startswith("data:"):
+                        data = line[len("data:"):].strip()
+                        obj = json.loads(data)["choices"][0]
+                        if "delta" in obj:
+                            delta = obj["delta"]
+                            if "role" in delta:
+                                if delta["role"] != "assistant":
+                                    raise ValueError("Role error")
+                            if "content" in delta:
+                                yield delta["content"]
+                        if "finish_reason" in obj:
+                            finish_reason = obj["finish_reason"]
+                            if finish_reason == "length":
+                                yield '\n\n[!] Error: Output truncated due to limit'
+                            elif finish_reason == "stop":
+                                pass
+                            else:
+                                yield f'\n\n[!] Error: finish_reason="{finish_reason}"'
+                            return
 
     return reply
 
