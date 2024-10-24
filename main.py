@@ -112,9 +112,9 @@ class PendingPool:
     async def wait_for(self, key: tuple[int, int]) -> None:
         if key not in self.pool:
             return
-        self.logger.info('Waiting for %r', key)
+        self.logger.info("Waiting for %r", key)
         await self.pool[key].wait()
-        self.logger.info('Waiting for %r finished', key)
+        self.logger.info("Waiting for %r finished", key)
 
 
 Handle = typing.Callable[["BotApp", telegram.Update, telegram.ext.CallbackContext], typing.Awaitable[None]]
@@ -128,7 +128,7 @@ def only_admin(func: Handle) -> Handle:
         if await self._is_admin(update.message.from_user.id):
             await func(self, update, context)
         else:
-            await self._send_message(update.effective_chat.id, 'only admin', update.message.message_id)
+            await self._send_message(update.effective_chat.id, "only admin", update.message.message_id)
 
     return wrapper
 
@@ -141,7 +141,7 @@ def only_user(func: Handle) -> Handle:
             await func(self, update, context)
         else:
             if update.effective_chat.id == update.message.from_user.id:
-                await self._send_message(update.effective_chat.id, 'only user', update.message.message_id)
+                await self._send_message(update.effective_chat.id, "only user", update.message.message_id)
 
     return wrapper
 
@@ -181,27 +181,27 @@ class BotApp:
         return await User.list(self.database_session)
 
     async def _send_message(self, chat_id: int, text: str, reply_to_message_id: int) -> int:
-        self.logger.info('Sending message: chat_id=%r, reply_to_message_id=%r, text=%r', chat_id, reply_to_message_id, text)
+        self.logger.info("Sending message: chat_id=%r, reply_to_message_id=%r, text=%r", chat_id, reply_to_message_id, text)
         msg = await self.app.bot.send_message(
             chat_id,
             text,
             reply_to_message_id=reply_to_message_id,
         )
-        self.logger.info('Message sent: chat_id=%r, reply_to_message_id=%r, message_id=%r', chat_id, reply_to_message_id, msg.message_id)
+        self.logger.info("Message sent: chat_id=%r, reply_to_message_id=%r, message_id=%r", chat_id, reply_to_message_id, msg.message_id)
         return msg.message_id
 
     async def _edit_message(self, chat_id: int, text: str, message_id: int, parse_mode: str | None = None) -> None:
-        self.logger.info('Editing message: chat_id=%r, message_id=%r, text=%r', chat_id, message_id, text)
+        self.logger.info("Editing message: chat_id=%r, message_id=%r, text=%r", chat_id, message_id, text)
         await self.app.bot.edit_message_text(
             text,
             chat_id=chat_id,
             message_id=message_id,
             parse_mode=parse_mode,
         )
-        self.logger.info('Message edited: chat_id=%r, message_id=%r', chat_id, message_id)
+        self.logger.info("Message edited: chat_id=%r, message_id=%r", chat_id, message_id)
 
     async def _ping_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
-        reply = f'chat_id={update.effective_chat.id} user_id={update.message.from_user.id}'
+        reply = f"chat_id={update.effective_chat.id} user_id={update.message.from_user.id}"
         await self._send_message(update.effective_chat.id, reply, update.message.message_id)
 
     async def _list_model_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
@@ -307,23 +307,23 @@ class BotApp:
         self.logger: logging.Logger = logger
         self.proxy: str | None = proxy
 
-        self.bot_id: int = int(self.telegram_token.split(':')[0])
+        self.bot_id: int = int(self.telegram_token.split(":")[0])
         self.pending_pool: PendingPool = PendingPool(self.logger)
         self.prefixes: dict[str, str] = {}
         self.models: dict[str, Model] = {}
 
     async def _set_commands(self):
         await self.app.bot.set_my_commands([
-            ('ping', 'Test bot connectivity'),
-            ('list_model', 'List models'),
-            ('list_admin', 'List admin (only admin)'),
-            ('add_admin', 'Add admin (only admin)'),
-            ('remove_admin', 'Remove admin (only admin)'),
-            ('list_user', 'List user (only admin)'),
-            ('add_user', 'Add user (only admin)'),
-            ('remove_user', 'Remove user (only admin)'),
-            ('add_current', 'Add current as user (only admin)'),
-            ('remove_current', 'Remove current as user (only admin)'),
+            ("ping", "Test bot connectivity"),
+            ("list_model", "List models"),
+            ("list_admin", "List admin (only admin)"),
+            ("add_admin", "Add admin (only admin)"),
+            ("remove_admin", "Remove admin (only admin)"),
+            ("list_user", "List user (only admin)"),
+            ("add_user", "Add user (only admin)"),
+            ("remove_user", "Remove user (only admin)"),
+            ("add_current", "Add current as user (only admin)"),
+            ("remove_current", "Remove current as user (only admin)"),
         ])
 
     async def run(self):
@@ -381,7 +381,7 @@ class BotApp:
         msg_id = update.message.message_id
         user_id = update.message.from_user.id
         text = update.message.text
-        self.logger.info('New message: chat_id=%r, user_id=%r, msg_id=%r, text=%r', chat_id, user_id, msg_id, text)
+        self.logger.info("New message: chat_id=%r, user_id=%r, msg_id=%r, text=%r", chat_id, user_id, msg_id, text)
 
         reply_to_message = update.message.reply_to_message
         if reply_to_message is None:
@@ -505,8 +505,8 @@ def gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | Non
         )
 
     async def reply(history: list[Message]) -> typing.AsyncGenerator[str, None]:
-        time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
-        messages = [{"role": "system", "content": f'You are {model} Telegram bot. {model} is a large language model trained by {owner}. Answer as concisely as possible. Current Beijing Time: {time}'}]
+        time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+        messages = [{"role": "system", "content": f"You are {model} Telegram bot. {model} is a large language model trained by {owner}. Answer as concisely as possible. Current Beijing Time: {time}"}]
         for message in history:
             messages.append({"role": "assistant" if message.is_me else "user", "content": message.text})
         stream = await aclient.chat.completions.create(model=model, messages=messages, stream=True)
@@ -516,11 +516,11 @@ def gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | Non
                 obj = response.choices[0]
                 if obj.delta is not None:
                     if obj.delta.role is not None:
-                        if obj.delta.role != 'assistant':
+                        if obj.delta.role != "assistant":
                             raise ValueError("Role error")
                     if obj.delta.content is not None:
                         yield obj.delta.content
-                if obj.finish_reason is not None or ('finish_details' in obj.model_extra and obj.finish_details is not None):
+                if obj.finish_reason is not None or ("finish_details" in obj.model_extra and obj.finish_details is not None):
                     assert all(item is None or item == "" for item in [
                         obj.delta.content,
                         obj.delta.function_call,
@@ -528,12 +528,12 @@ def gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | Non
                         obj.delta.tool_calls,
                     ])
                     finish_reason = obj.finish_reason
-                    if 'finish_details' in obj.model_extra and obj.finish_details is not None:
+                    if "finish_details" in obj.model_extra and obj.finish_details is not None:
                         assert finish_reason is None
-                        finish_reason = obj.finish_details['type']
-                    if finish_reason == 'length':
-                        yield '\n\n[!] Error: Output truncated due to limit'
-                    elif finish_reason == 'stop':
+                        finish_reason = obj.finish_details["type"]
+                    if finish_reason == "length":
+                        yield "\n\n[!] Error: Output truncated due to limit"
+                    elif finish_reason == "stop":
                         pass
                     elif finish_reason is not None:
                         if obj.finish_reason is not None:
@@ -549,8 +549,8 @@ def zhipu(*, model: str, api_key: str, endpoint: str, owner: str) -> Model:
     import datetime
 
     async def reply(history: list[Message]) -> typing.AsyncGenerator[str, None]:
-        time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
-        messages = [{"role": "system", "content": f'You are {model} Telegram bot. {model} is a large language model trained by {owner}. Answer as concisely as possible. Current Beijing Time: {time}'}]
+        time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+        messages = [{"role": "system", "content": f"You are {model} Telegram bot. {model} is a large language model trained by {owner}. Answer as concisely as possible. Current Beijing Time: {time}"}]
         for message in history:
             messages.append({"role": "assistant" if message.is_me else "user", "content": message.text})
 
@@ -562,7 +562,7 @@ def zhipu(*, model: str, api_key: str, endpoint: str, owner: str) -> Model:
 
             response.raise_for_status()
             async for chunk in response.aiter_bytes():
-                decoded_chunk = chunk.decode('utf-8')
+                decoded_chunk = chunk.decode("utf-8")
                 for line in decoded_chunk.splitlines():
                     if line.startswith("data:"):
                         data = line[len("data:"):].strip()
@@ -577,7 +577,7 @@ def zhipu(*, model: str, api_key: str, endpoint: str, owner: str) -> Model:
                         if "finish_reason" in obj:
                             finish_reason = obj["finish_reason"]
                             if finish_reason == "length":
-                                yield '\n\n[!] Error: Output truncated due to limit'
+                                yield "\n\n[!] Error: Output truncated due to limit"
                             elif finish_reason == "stop":
                                 pass
                             else:
@@ -587,17 +587,17 @@ def zhipu(*, model: str, api_key: str, endpoint: str, owner: str) -> Model:
     return reply
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import yaml
 
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s :: %(levelname)s :: %(message)s')
+    formatter = logging.Formatter("%(asctime)s :: %(levelname)s :: %(message)s")
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setLevel(logging.INFO)
     stdout_handler.setFormatter(formatter)
     logger.addHandler(stdout_handler)
-    file_handler = logging.FileHandler(f'{__file__}.log')
+    file_handler = logging.FileHandler(f"{__file__}.log")
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
