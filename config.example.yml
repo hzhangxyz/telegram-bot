@@ -13,17 +13,20 @@ models:
       owner: 01-AI
   - name: gpt-4o-mini
     prefix: $
-    type: azure_gpt
+    type: gpt
     args:
       api_key: abcdefg
       endpoint: https://hzhangxyzopenai.openai.azure.com
       model: gpt-4o-mini
       owner: OpenAI
+      azure: true
+      proxy: socks5://localhost:10808
   - name: gpt-4o
     prefix: $$
-    type: azure_gpt
+    type: gpt
     args:
       api_key: abcdefg
       endpoint: https://hzhangxyzopenai.openai.azure.com
       model: gpt-4o
       owner: OpenAI
+      azure: true

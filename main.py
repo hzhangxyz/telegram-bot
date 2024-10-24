@@ -482,71 +482,27 @@ def echo() -> Model:
     return reply
 
 
-def azure_gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | None = None) -> Model:
+def gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | None = None, azure: bool = False) -> Model:
     import openai
     import datetime
 
-    aclient = openai.AsyncAzureOpenAI(
-        api_key=api_key,
-        api_version="2024-02-15-preview",
-        azure_endpoint=endpoint,
-        http_client=httpx.AsyncClient(proxy=proxy) if proxy is not None else None,
-        max_retries=0,
-        timeout=15,
-    )
-
-    async def reply(history: list[Message]) -> typing.AsyncGenerator[str, None]:
-        time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
-        messages = [{"role": "system", "content": f'You are {model} Telegram bot. {model} is a large language model trained by {owner}. Answer as concisely as possible. Current Beijing Time: {time}'}]
-        for message in history:
-            messages.append({"role": "assistant" if message.is_me else "user", "content": message.text})
-        stream = await aclient.chat.completions.create(model=model, messages=messages, stream=True)
-        async for response in stream:
-            if response.choices:
-                assert len(response.choices) == 1
-                obj = response.choices[0]
-                if obj.delta is not None:
-                    if obj.delta.role is not None:
-                        if obj.delta.role != 'assistant':
-                            raise ValueError("Role error")
-                    if obj.delta.content is not None:
-                        yield obj.delta.content
-                if obj.finish_reason is not None or ('finish_details' in obj.model_extra and obj.finish_details is not None):
-                    assert all(item is None or item == "" for item in [
-                        obj.delta.content,
-                        obj.delta.function_call,
-                        obj.delta.role,
-                        obj.delta.tool_calls,
-                    ])
-                    finish_reason = obj.finish_reason
-                    if 'finish_details' in obj.model_extra and obj.finish_details is not None:
-                        assert finish_reason is None
-                        finish_reason = obj.finish_details['type']
-                    if finish_reason == 'length':
-                        yield '\n\n[!] Error: Output truncated due to limit'
-                    elif finish_reason == 'stop':
-                        pass
-                    elif finish_reason is not None:
-                        if obj.finish_reason is not None:
-                            yield f'\n\n[!] Error: finish_reason="{finish_reason}"'
-                        else:
-                            yield f'\n\n[!] Error: finish_details="{obj.finish_details}"'
-                    return
-
-    return reply
-
-
-def gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | None = None) -> Model:
-    import openai
-    import datetime
-
-    aclient = openai.AsyncOpenAI(
-        api_key=api_key,
-        base_url=endpoint,
-        http_client=httpx.AsyncClient(proxy=proxy) if proxy is not None else None,
-        max_retries=0,
-        timeout=15,
-    )
+    if azure:
+        aclient = openai.AsyncAzureOpenAI(
+            api_key=api_key,
+            api_version="2024-02-15-preview",
+            azure_endpoint=endpoint,
+            http_client=httpx.AsyncClient(proxy=proxy) if proxy is not None else None,
+            max_retries=0,
+            timeout=15,
+        )
+    else:
+        aclient = openai.AsyncOpenAI(
+            api_key=api_key,
+            base_url=endpoint,
+            http_client=httpx.AsyncClient(proxy=proxy) if proxy is not None else None,
+            max_retries=0,
+            timeout=15,
+        )
 
     async def reply(history: list[Message]) -> typing.AsyncGenerator[str, None]:
         time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
