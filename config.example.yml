@@ -1,17 +1,34 @@
 app:
-  telegram_token: abcdefg
-  database_url: sqlite+aiosqlite:///./telegram_llm_bot.db
-  owner_id: 1234567
+  telegram_token: 123456:abcdefg
+  database_url: sqlite+aiosqlite:///./telegram_bot.db
+  owner_id: 1784699707
   continue_prefix: "-"
+  proxy: socks5://localhost:10808
 models:
-  - name: yi-lightning
-    prefix: "&"
+  - name: mistral-nemo
+    prefix: "!"
     type: gpt
     args:
       api_key: abcdefg
-      endpoint: https://api.lingyiwanwu.com/v1
-      model: yi-lightning
-      owner: 01-AI
+      endpoint: https://api.mistral.ai/v1
+      model: open-mistral-nemo
+      owner: Mistral AI
+  - name: mistral-small
+    prefix: "!!"
+    type: gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://api.mistral.ai/v1
+      model: mistral-small-latest
+      owner: Mistral AI
+  - name: mistral-large
+    prefix: "!!!"
+    type: gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://api.mistral.ai/v1
+      model: mistral-large-latest
+      owner: Mistral AI
   - name: gpt-4o-mini
     prefix: $
     type: gpt
@@ -20,8 +37,8 @@ models:
       endpoint: https://hzhangxyzopenai.openai.azure.com
       model: gpt-4o-mini
       owner: OpenAI
-      azure: true
       proxy: socks5://localhost:10808
+      azure: true
   - name: gpt-4o
     prefix: $$
     type: gpt
@@ -30,4 +47,102 @@ models:
       endpoint: https://hzhangxyzopenai.openai.azure.com
       model: gpt-4o
       owner: OpenAI
+      proxy: socks5://localhost:10808
       azure: true
+  - name: grok
+    prefix: ￥
+    type: gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://api.x.ai/v1
+      model: grok-beta
+      owner: xAI
+      proxy: socks5://localhost:10808
+  - name: claude
+    prefix: ￥￥
+    type: anthropic
+    args:
+      api_key: abcdefg
+      model: claude-3-5-sonnet-20241022
+      owner: Anthropic
+      proxy: socks5://localhost:10808
+  - name: gemini-flash
+    prefix: "%"
+    type: gemini
+    args:
+      api_key: abcdefg
+      model: gemini-1.5-flash
+      owner: Google
+      proxy: socks5://localhost:10808
+  - name: gemini-pro
+    prefix: "%%"
+    type: gemini
+    args:
+      api_key: abcdefg
+      model: gemini-1.5-pro
+      owner: Google
+      proxy: socks5://localhost:10808
+  - name: qwen-turbo
+    prefix: ^
+    type: gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://dashscope.aliyuncs.com/compatible-mode/v1
+      model: qwen-turbo
+      owner: Alibaba
+  - name: qwen-plus
+    prefix: ^^
+    type: gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://dashscope.aliyuncs.com/compatible-mode/v1
+      model: qwen-plus
+      owner: Alibaba
+  - name: qwen-max
+    prefix: ^^^
+    type: gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://dashscope.aliyuncs.com/compatible-mode/v1
+      model: qwen-max
+      owner: Alibaba
+  - name: yi-lightning
+    prefix: "&"
+    type: gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://api.lingyiwanwu.com/v1
+      model: yi-lightning
+      owner: 01-AI
+  - name: deepseek-chat
+    prefix: "&&"
+    type: gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://api.deepseek.com/beta
+      model: deepseek-chat
+      owner: Deepseek
+  - name: glm-4-flash
+    prefix: "*"
+    type: gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://open.bigmodel.cn/api/paas/v4
+      model: glm-4-flash
+      owner: Zhipu
+  - name: glm-4-air
+    prefix: "**"
+    type: gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://open.bigmodel.cn/api/paas/v4
+      model: glm-4-air
+      owner: Zhipu
+  - name: glm-4-plus
+    prefix: "***"
+    type: gpt
+    args:
+      api_key: abcdefg
+      endpoint: https://open.bigmodel.cn/api/paas/v4
+      model: glm-4-plus
+      owner: Zhipu
