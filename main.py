@@ -460,7 +460,6 @@ class MessageSender:
         self.chat_id = chat_id
         self.msg_id = msg_id
         self.model = model
-        self.last_update = True
         self.start = False
         self.first = True
         self.reply = ""
@@ -468,13 +467,14 @@ class MessageSender:
     async def __aenter__(self):
         return self
 
-    async def _update(self):
+    async def _update(self, last=False):
+        suffix = "" if last else " [!Generating...]"
         if self.first:
             self.first = False
-            self.new_msg_id = await self.owner._send_message(self.chat_id, f"[{self.model}] " + self.reply, self.msg_id)
+            self.new_msg_id = await self.owner._send_message(self.chat_id, f"[{self.model}] " + self.reply + suffix, self.msg_id)
             self.owner.pending_pool.add((self.chat_id, self.new_msg_id))
         else:
-            await self.owner._edit_message(self.chat_id, f"[{self.model}] " + self.reply, self.new_msg_id)
+            await self.owner._edit_message(self.chat_id, f"[{self.model}] " + self.reply + suffix, self.new_msg_id)
 
     async def update(self, reply: str):
         if self.reply == reply:
@@ -486,14 +486,10 @@ class MessageSender:
         current_time = time.time()
         if current_time > self.target_time:
             await self._update()
-            self.last_update = False
             self.target_time = current_time + 3
-        else:
-            self.last_update = True
 
     async def __aexit__(self, *args):
-        if self.last_update:
-            await self._update()
+        await self._update(last=True)
         self.owner.pending_pool.remove((self.chat_id, self.new_msg_id))
 
 
