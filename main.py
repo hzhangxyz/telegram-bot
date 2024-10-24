@@ -180,12 +180,13 @@ class BotApp:
         self.logger.info("list user")
         return await User.list(self.database_session)
 
-    async def _send_message(self, chat_id: int, text: str, reply_to_message_id: int) -> int:
+    async def _send_message(self, chat_id: int, text: str, reply_to_message_id: int, parse_mode: str | None = None) -> int:
         self.logger.info("Sending message: chat_id=%r, reply_to_message_id=%r, text=%r", chat_id, reply_to_message_id, text)
         msg = await self.app.bot.send_message(
             chat_id,
             text,
             reply_to_message_id=reply_to_message_id,
+            parse_mode=parse_mode,
         )
         self.logger.info("Message sent: chat_id=%r, reply_to_message_id=%r, message_id=%r", chat_id, reply_to_message_id, msg.message_id)
         return msg.message_id
@@ -203,6 +204,10 @@ class BotApp:
     async def _ping_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
         reply = f"chat_id={update.effective_chat.id} user_id={update.message.from_user.id}"
         await self._send_message(update.effective_chat.id, reply, update.message.message_id)
+
+    async def _help_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
+        reply = f"This is a Telegram bot. By sending messages with a specific prefix to this bot, you can invoke a corresponding large language model and receive a reply. The specific models can be viewed by typing [/list_model]. Messages replied to the bot can enable continuous conversations, where messages prefixed with `{self.continue_prefix}` will be automatically regarded as replies to the bot's previous message. The owner of this robot is [this](tg://user?id={self.owner_id})."
+        await self._send_message(update.effective_chat.id, reply, update.message.message_id, parse_mode="Markdown")
 
     async def _list_model_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
         reply = "\n".join([f"prefix {p} for model {m}" for p, m in self.prefixes.items()])
@@ -316,6 +321,7 @@ class BotApp:
 
     async def _set_commands(self):
         await self.app.bot.set_my_commands([
+            ("help", "Get help"),
             ("ping", "Test bot connectivity"),
             ("list_model", "List models"),
             ("list_admin", "List admin (only admin)"),
@@ -347,6 +353,8 @@ class BotApp:
         self.app = builder.build()
         self.logger.info("Add command handlers")
         self.app.add_handler(telegram.ext.CommandHandler("ping", self._ping_handle))
+        self.app.add_handler(telegram.ext.CommandHandler("help", self._help_handle))
+        self.app.add_handler(telegram.ext.CommandHandler("start", self._help_handle))
         self.app.add_handler(telegram.ext.CommandHandler("list_model", self._list_model_handle))
         self.app.add_handler(telegram.ext.CommandHandler("list_admin", self._list_admin_handle))
         self.app.add_handler(telegram.ext.CommandHandler("add_admin", self._add_admin_handle))
