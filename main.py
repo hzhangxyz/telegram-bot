@@ -523,6 +523,71 @@ def anthropic(*, model: str, api_key: str, owner: str, proxy: str | None = None)
     return reply
 
 
+def gemini(*, model: str, api_key: str, owner: str, proxy: str | None = None) -> Model:
+    import datetime
+
+    async def reply(history: list[Message]) -> typing.AsyncGenerator[str, None]:
+        time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+        system = f"You are {model} Telegram bot. {model} is a large language model trained by {owner}. Answer as concisely as possible. Current Beijing Time: {time}"
+
+        base_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent"
+        params = {'alt': 'sse', 'key': api_key}
+        headers = {
+            'Content-Type': 'application/json',
+        }
+        messages = []
+        for message in history:
+            messages.append({"role": "model" if message.is_me else "user", "parts": [{"text": message.text}]})
+        data = {
+            "contents":
+                messages,
+            "systemInstruction": {
+                "parts": [{
+                    "text": system
+                }]
+            },
+            "safetySettings": [{
+                "category": category,
+                "threshold": "BLOCK_NONE"
+            } for category in [
+                "HARM_CATEGORY_HARASSMENT",
+                "HARM_CATEGORY_HATE_SPEECH",
+                "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "HARM_CATEGORY_DANGEROUS_CONTENT",
+                "HARM_CATEGORY_CIVIC_INTEGRITY",
+            ]],
+        }
+
+        async with httpx.AsyncClient(proxy=proxy) as client:
+            async with client.stream("POST", base_url, headers=headers, params=params, data=json.dumps(data)) as response:
+                async for chunk in response.aiter_text():
+                    for line in chunk.splitlines():
+                        if line.startswith("data:"):
+                            data = line[len("data:"):].strip()
+                            obj = json.loads(data)["candidates"][0]
+                            if "content" in obj:
+                                content = obj["content"]
+                                if "role" in content:
+                                    if content["role"] != "model":
+                                        raise ValueError("Role error")
+                                if "parts" in content:
+                                    parts = content["parts"]
+                                    assert len(parts) == 1
+                                    part = parts[0]
+                                    yield part["text"]
+                            if "finishReason" in obj:
+                                finish_reason = obj["finishReason"]
+                                if finish_reason == "MAX_TOKENS":
+                                    yield '\n\n[!] Error: Output truncated due to limit'
+                                elif finish_reason == "STOP":
+                                    pass
+                                else:
+                                    yield f'\n\n[!] Error: finish_reason="{finish_reason}"'
+                                return
+
+    return reply
+
+
 def gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | None = None, azure: bool = False) -> Model:
     import openai
     import datetime
