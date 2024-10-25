@@ -67,7 +67,8 @@ class Message(Base):
     is_me: sqlalchemy.orm.Mapped[bool] = sqlalchemy.orm.mapped_column(sqlalchemy.Boolean)
     text: sqlalchemy.orm.Mapped[str] = sqlalchemy.orm.mapped_column(sqlalchemy.Text)
     model: sqlalchemy.orm.Mapped[str | None] = sqlalchemy.orm.mapped_column(sqlalchemy.String(32))
-    reply_id: sqlalchemy.orm.Mapped[int | None] = sqlalchemy.orm.mapped_column(sqlalchemy.BigInteger)
+    reply_id: sqlalchemy.orm.Mapped[int | None] = sqlalchemy.orm.mapped_column(sqlalchemy.BigInteger, sqlalchemy.ForeignKey("message.msg_id"))
+    reply_to: sqlalchemy.orm.Mapped[Message | None] = sqlalchemy.orm.relationship("Message", remote_side=[chat_id, msg_id], foreign_keys=[reply_id])
 
     async def add(self, session: sqlalchemy.ext.asyncio.async_sessionmaker[sqlalchemy.ext.asyncio.AsyncSession]) -> None:
         async with session() as sess:
@@ -76,16 +77,15 @@ class Message(Base):
 
     async def history(self, session: sqlalchemy.ext.asyncio.async_sessionmaker[sqlalchemy.ext.asyncio.AsyncSession]) -> list[Message] | None:
         async with session() as sess:
-            result = [self]
-            msg_id = self.reply_id
-            while msg_id is not None:
-                query = await sess.execute(sqlalchemy.select(self.__class__).filter_by(chat_id=self.chat_id, msg_id=msg_id))
-                message = query.scalar_one_or_none()
+            message = await sess.merge(self)
+            result = [message]
+            while True:
+                if message.reply_id is None:
+                    break
+                message = await message.awaitable_attrs.reply_to
                 if message is None:
                     return None
                 result.append(message)
-                msg_id = message.reply_id
-
             result.reverse()
             return result
 
@@ -408,7 +408,7 @@ class BotApp:
     async def run(self):
         self.logger.info("Connect to database")
         database_engine = sqlalchemy.ext.asyncio.create_async_engine(self.database_url)
-        self.database_session = sqlalchemy.ext.asyncio.async_sessionmaker(database_engine, expire_on_commit=False)
+        self.database_session = sqlalchemy.ext.asyncio.async_sessionmaker(database_engine)
         async with database_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         if not await self._is_admin(self.owner_id):
