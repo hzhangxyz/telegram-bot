@@ -1,7 +1,9 @@
 from __future__ import annotations
+import os
 import sys
 import time
 import json
+import signal
 import datetime
 import functools
 import typing
@@ -364,6 +366,12 @@ class BotApp:
         await self._remove_user(id)
         await self._send_message(update.effective_chat.id, "done", update.message.message_id)
 
+    @only_admin
+    async def _restart_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
+        await self._send_message(update.effective_chat.id, "restarting", update.message.message_id)
+        self.restart = True
+        os.kill(os.getpid(), signal.SIGINT)
+
     def __init__(self, telegram_token: str, database_url: str, owner_id: int, continue_prefix: str, logger: logging.Logger, proxy: str | None = None) -> None:
         self.telegram_token: str = telegram_token
         self.database_url: str = database_url
@@ -376,6 +384,7 @@ class BotApp:
         self.pending_pool: PendingPool = PendingPool(self.logger)
         self.prefixes: dict[str, str] = {}
         self.models: dict[str, Model] = {}
+        self.restart: bool = False
 
     async def _set_commands(self):
         await self.app.bot.set_my_commands([
@@ -393,6 +402,7 @@ class BotApp:
             ("remove_user", "Remove user (only admin)"),
             ("add_current", "Add current as user (only admin)"),
             ("remove_current", "Remove current as user (only admin)"),
+            ("restart", "Restart the bot"),
         ])
 
     async def run(self):
@@ -428,6 +438,7 @@ class BotApp:
         self.app.add_handler(telegram.ext.CommandHandler("remove_user", self._remove_user_handle))
         self.app.add_handler(telegram.ext.CommandHandler("add_current", self._add_current_handle))
         self.app.add_handler(telegram.ext.CommandHandler("remove_current", self._remove_current_handle))
+        self.app.add_handler(telegram.ext.CommandHandler("restart", self._restart_handle))
         self.app.add_handler(telegram.ext.MessageHandler(telegram.ext.filters.TEXT & (~telegram.ext.filters.COMMAND), self._message_handle))
 
         self.logger.info("Setup the application")
@@ -448,6 +459,9 @@ class BotApp:
 
         self.logger.info("Disconnect from database")
         await database_engine.dispose()
+
+        if self.restart:
+            os.execv(sys.executable, [sys.executable] + sys.argv)
 
     @only_user
     async def _message_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
