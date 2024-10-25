@@ -1,7 +1,8 @@
-app:
+application:
   telegram_token: 123456:abcdefg
   database_url: sqlite+aiosqlite:///./telegram_bot.db
   owner_id: 1784699707
+  owner_name: hzhangxyz
   continue_prefix: "-"
   proxy: socks5://localhost:10808
 models:

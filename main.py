@@ -254,7 +254,7 @@ class BotApp:
         await self._send_message(update.effective_chat.id, reply, update.message.message_id)
 
     async def _help_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
-        reply = f"This is a Telegram bot. By sending messages with a specific prefix to this bot, you can invoke a corresponding large language model and receive a reply. The specific models can be viewed by typing [/list_model]. Messages replied to the bot can enable continuous conversations, where messages prefixed with `{self.continue_prefix}` will be automatically regarded as replies to the bot's previous message. The owner of this robot is [this](tg://user?id={self.owner_id})."
+        reply = f"This is a Telegram bot. By sending messages with a specific prefix to this bot, you can invoke a corresponding large language model and receive a reply. The specific models can be viewed by typing [/list_model]. Messages replied to the bot can enable continuous conversations, where messages prefixed with `{self.continue_prefix}` will be automatically regarded as replies to the bot's previous message. The owner of this robot is [this](tg://resolve?domain={self.owner_name}&profile)."
         await self._send_message(update.effective_chat.id, reply, update.message.message_id, parse_mode="Markdown")
 
     async def _list_model_handle(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
@@ -372,10 +372,11 @@ class BotApp:
         self.restart = True
         os.kill(os.getpid(), signal.SIGINT)
 
-    def __init__(self, telegram_token: str, database_url: str, owner_id: int, continue_prefix: str, logger: logging.Logger, proxy: str | None = None) -> None:
+    def __init__(self, telegram_token: str, database_url: str, owner_id: int, owner_name: str, continue_prefix: str, logger: logging.Logger, proxy: str | None = None) -> None:
         self.telegram_token: str = telegram_token
         self.database_url: str = database_url
         self.owner_id: int = owner_id
+        self.owner_name: str = owner_name
         self.continue_prefix: str = "-"
         self.logger: logging.Logger = logger
         self.proxy: str | None = proxy
@@ -727,7 +728,7 @@ if __name__ == "__main__":
     with open(config_file, "rt", encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
-    app = BotApp(logger=logger, **config["app"])
+    app = BotApp(logger=logger, **config["application"])
 
     for model in config["models"]:
         app.prefixes[model["prefix"]] = model["name"]
