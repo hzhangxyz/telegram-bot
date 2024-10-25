@@ -402,7 +402,7 @@ class BotApp:
             ("remove_user", "Remove user (only admin)"),
             ("add_current", "Add current as user (only admin)"),
             ("remove_current", "Remove current as user (only admin)"),
-            ("restart", "Restart the bot"),
+            ("restart", "Restart the bot (only admin)"),
         ])
 
     async def run(self):
