@@ -67,7 +67,14 @@ class Message(Base):
     is_me: sqlalchemy.orm.Mapped[bool] = sqlalchemy.orm.mapped_column(sqlalchemy.Boolean)
     text: sqlalchemy.orm.Mapped[str] = sqlalchemy.orm.mapped_column(sqlalchemy.Text)
     model: sqlalchemy.orm.Mapped[str | None] = sqlalchemy.orm.mapped_column(sqlalchemy.String(32))
-    reply_id: sqlalchemy.orm.Mapped[int | None] = sqlalchemy.orm.mapped_column(sqlalchemy.BigInteger)
+    reply_id: sqlalchemy.orm.Mapped[int | None] = sqlalchemy.orm.mapped_column(sqlalchemy.BigInteger, sqlalchemy.ForeignKey("message.msg_id"))
+    reply_to: sqlalchemy.orm.Mapped[Message | None] = sqlalchemy.orm.relationship(
+        "Message",
+        primaryjoin=lambda: sqlalchemy.and_(
+            sqlalchemy.orm.foreign(Message.chat_id) == sqlalchemy.orm.remote(Message.chat_id),
+            sqlalchemy.orm.foreign(Message.reply_id) == sqlalchemy.orm.remote(Message.msg_id),
+        ),
+    )
 
     async def add(self, session: sqlalchemy.ext.asyncio.async_sessionmaker[sqlalchemy.ext.asyncio.AsyncSession]) -> None:
         async with session() as sess:
@@ -81,8 +88,7 @@ class Message(Base):
             while True:
                 if message.reply_id is None:
                     break
-                query = await sess.execute(sqlalchemy.select(type(self)).filter_by(chat_id=message.chat_id, msg_id=message.reply_id))
-                message = query.scalar_one_or_none()
+                message = await message.awaitable_attrs.reply_to
                 if message is None:
                     return None
                 result.append(message)
