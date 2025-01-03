@@ -696,11 +696,11 @@ def gpt(*, model: str, api_key: str, endpoint: str, owner: str, proxy: str | Non
                             raise ValueError("Role error")
                     if obj.delta.content is not None:
                         yield obj.delta.content
-                if obj.finish_reason is not None:
+                if obj.finish_reason is not None and obj.finish_reason != "":
                     assert obj.delta.content is None or obj.delta.content == ""
                     assert obj.delta.function_call is None
                     assert obj.delta.role is None or obj.delta.role == "assistant"
-                    assert obj.delta.tool_calls is None
+                    assert obj.delta.tool_calls is None or obj.delta.tool_calls == []
                     finish_reason = obj.finish_reason
                     if finish_reason == "length":
                         yield "\n\n[!] Error: Output truncated due to limit"
